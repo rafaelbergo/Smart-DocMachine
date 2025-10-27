@@ -27,4 +27,8 @@ audio_test = os.path.join(AUDIOS_FOLDER, 'processando_doc.wav')
 
 if __name__ == '__main__':
     playAudio(os.path.join(AUDIOS_FOLDER, 'processando_doc.wav'))
+    time.sleep(5)
+
+    playAudio(os.path.join(AUDIOS_FOLDER, 'doc_processado.wav'))
+
     #text_to_audio("Processando documento, aguarde.", audio_test)
