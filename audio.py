@@ -45,3 +45,59 @@ def playAudio(filepath: str) -> bool:
 
 def playAudio_async(filepath: str) -> None:
     threading.Thread(target=playAudio, args=(filepath,), daemon=True).start()
+
+
+_rec_state = {
+    "stream": None,
+    "file": None,
+    "lock": threading.Lock(),
+}
+
+def start_recording(out_path: str, sample_rate: int = 44100, channels: int = 1, device=None) -> bool:
+    os.makedirs(os.path.dirname(out_path), exist_ok=True)
+    with _rec_state["lock"]:
+        if _rec_state["stream"] is not None:
+            print("[audio] ja esta gravando; ignorando novo start.")
+            return False
+
+        # abre arquivo WAV e stream de entrada
+        sf_file = sf.SoundFile(out_path, mode='w', samplerate=sample_rate,
+                               channels=channels, subtype='PCM_16')
+
+        def _callback(indata, frames, time, status):
+            if status:
+                print(f"[audio] status: {status}")
+            # grava dados diretamente (int16)
+            sf_file.write(indata)
+
+        stream = sd.InputStream(samplerate=sample_rate,
+                                channels=channels,
+                                dtype='int16',
+                                callback=_callback,
+                                device=device)
+
+        stream.start()
+        _rec_state["file"] = sf_file
+        _rec_state["stream"] = stream
+        print(f"[audio] gravando... -> {out_path}")
+        return True
+
+def stop_recording() -> bool:
+
+    with _rec_state["lock"]:
+        stream = _rec_state["stream"]
+        sf_file = _rec_state["file"]
+        if stream is None:
+            print("[audio] nao estava gravando.")
+            return False
+        try:
+            stream.stop()
+            stream.close()
+        finally:
+            _rec_state["stream"] = None
+        try:
+            sf_file.close()
+        finally:
+            _rec_state["file"] = None
+        print("[audio] gravacao finalizada e salva.")
+        return True
