@@ -1,39 +1,67 @@
 import RPi.GPIO as GPIO
 import time
+import os
+import threading
+from audio import playAudio, playAudio_async
+from document import take_picture
 
-# Definir o modo de numeracao dos pinos
-GPIO.setmode(GPIO.BCM)
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+AUDIOS_FOLDER = os.path.join(BASE_DIR, 'data', 'audios')
 
-# Definir os pinos
-button_pin = 16  # Pino do botao (GPIO 16)
-led_pin = 26     # Pino do MOSFET (GPIO 26)
+BUTTON_PIN = 16
+LED_PIN = 26
 
-# Configuraco do botao (entrada com resistor de pull-up interno)
-GPIO.setup(button_pin, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+_initialized = False
+_busy = False
 
-# Configuracao do pino de controle do MOSFET (sai­da)
-GPIO.setup(led_pin, GPIO.OUT)
+def _run_sequence():
+    global _busy
+    try:
+        playAudio_async(os.path.join(AUDIOS_FOLDER, 'processando_doc.wav'))
 
-# Variavel para armazenar o estado da fita de LED
-led_state = False
+        time.sleep(0.5)
+        ok = take_picture()
+        if not ok:
+            print("[LEDS] Falha ao tirar foto.")
+        else:
+            print("[LEDS] Foto capturada com sucesso.")
 
-# Funcao para alternar o estado do LED
-def toggle_led(channel):
-    global led_state
-    led_state = not led_state  # Alterna o estado
-    if led_state:
-        GPIO.output(led_pin, GPIO.HIGH)  # Liga o LED
-        print("Fita de LED ligada!")
-    else:
-        GPIO.output(led_pin, GPIO.LOW)   # Desliga o LED
-        print("Fita de LED desligada!")
+        time.sleep(5)
 
-# Configura a interrupcao para o botaoo (detecta a transicao de "pressionado")
-GPIO.add_event_detect(button_pin, GPIO.FALLING, callback=toggle_led, bouncetime=300)
+        # Desliga LED
+        GPIO.output(LED_PIN, GPIO.LOW)
+        print("[LEDS] LED desligado apos captura.")
 
-try:
-    while True:
-        time.sleep(1)
+        audio_ok = playAudio(os.path.join(AUDIOS_FOLDER, 'doc_processado.wav'))
+        if not audio_ok:
+            print("[LEDS] Falha ao tocar 'doc_processado.wav'")
+    finally:
+        _busy = False
 
-finally:
+def _toggle_led(channel):
+    global _busy
+    if _busy:
+        print("[LEDS] Codigo ja rodando, ignorando.")
+        return
+
+    _busy = True
+    GPIO.output(LED_PIN, GPIO.HIGH)
+    threading.Thread(target=_run_sequence, daemon=True).start()
+
+def setup():
+    global _initialized
+    if _initialized:
+        return
+    GPIO.setmode(GPIO.BCM)
+    GPIO.setup(BUTTON_PIN, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+    GPIO.setup(LED_PIN, GPIO.OUT, initial=GPIO.LOW)
+    GPIO.add_event_detect(BUTTON_PIN, GPIO.FALLING, callback=_toggle_led, bouncetime=300)
+    _initialized = True
+
+def cleanup():
+    try:
+        GPIO.remove_event_detect(BUTTON_PIN)
+    except Exception:
+        pass
     GPIO.cleanup()
+    
