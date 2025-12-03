@@ -5,3 +5,5 @@ gTTS==2.5.4
 python-dotenv==1.2.1
 sounddevice==0.5.3
 soundfile==0.13.1
+pathlib
+cerebras-cloud-sdk
