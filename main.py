@@ -7,6 +7,7 @@ import soundfile as sf
 from dotenv import load_dotenv
 from audio import *
 import leds
+from audio import playAudio_async
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 FOLDER = BASE_DIR
@@ -24,6 +25,7 @@ audio_test = os.path.join(AUDIOS_FOLDER, 'processando_doc.wav')
 
 if __name__ == '__main__':
     try:
+        #playAudio_async(os.path.join(BASE_DIR, 'data', 'audios', 'inicio.wav'))
         leds.setup()
         print("[MAIN] iniciado.")
         while True:
